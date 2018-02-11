@@ -1,0 +1,75 @@
+---
+title: "Course 8 Project"
+output: html_document
+---
+##Summary
+This is project is to analyze the personal activity collected from accelerometers on the belt, forearm, arm and dumbell of 6 participants. And they were asked to perform barbell lifts correctly and incorrectly in 5 different ways. The goal is to use the data to predict the manner in which they did the exercise. There are two machine learning methods applied in this report, decision tree and random forest. With the comparison of out of sample accuracy of two models, random forest model is selected as the final model.
+
+##Data
+###Summary
+There are two datasets: train and test. Train dataset is https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv. Test dataset is https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv.
+###Missing value
+There are multiple missing strings,(NA,'#DIV/0!','') in the train dataset. While reading into R, convert multiple missing strings to NA.
+```{r,echo=TRUE}
+testdata=read.csv('test.csv',sep=',',head=T,na.strings=c('NA','#DIV/0!',''))
+traindata=read.csv('train.csv',sep=',',head=T,na.strings=c('NA','#DIV/0!',''))
+traindata2=traindata[,colSums(is.na(traindata))==0]
+testdata2=testdata[,colSums(is.na(testdata))==0]
+```
+Train dataset: there are `r dim(traindata)[1]` rows and `r dim(traindata)[2]` columns.
+After removing columns with missing values, there are `r dim(traindata2)[2]` columns in the train dataset. 
+Test dataset: there are `r dim(testdata)[1]` rows and `r dim(testdata)[2]` columns.
+After removing columns with missing values, there are `r dim(traindata2)[2]` columns in the test dataset.
+
+###Irrelavant columns
+The first 7 columns are subjects names and time stamp data. These columns will not be able to contribute to the models.
+```{r,echo=TRUE}
+traindata3=traindata2[,-c(1:7)]
+testdata3=testdata2[,-c(1:7)]
+```
+
+##Data Exploration
+```{r,echo=TRUE}
+library(ggplot2)
+ggplot(traindata,aes(x=classe))+
+  geom_bar(aes(y=..count..),fill='blue')
+```
+There are more A activity in the training dataset. B,C and E activity are close to each other.
+##Model Selection
+####Cross Validation
+Cross-validation will be performed by subsampling our training data set randomly without replacement into 2 subsamples: 75% of the tidy training dataset as the modeling training dataset and 25% of the tidy training dataset as the modeling testing dataset. The tidy test dataset will be tested with the final model.
+```{r,echo=TRUE}
+library(caret)
+set.seed(33833)
+intrain=createDataPartition(traindata$classe,p=0.75,list=FALSE)
+training=traindata3[intrain,]
+testing=traindata3[-intrain,]
+```
+
+### Model 1: Decision Tree
+```{r,echo=TRUE}
+library(rpart)
+fit1=rpart(classe~.,data=training,method='class')
+pred1=predict(fit1,newdata=testing,type='class')
+confusionMatrix(pred1,testing$classe)$overall[1]
+```
+Decision Tree model has accuracy of `r confusionMatrix(pred1,testing$classe)$overall[1]`.
+###Model 2: Random Forest
+```{r,echo=TRUE}
+library(randomForest)
+fit2=randomForest(classe~.,data=training,method='class')
+importance(fit2)[1:5,]
+pred2=predict(fit2,newdata=testing,type='class')
+confusionMatrix(pred2,testing$classe)$overall[1]
+```
+Random Forest has accuracy of `r confusionMatrix(pred2,testing$classe)$overall[1]`.
+
+Random Forest has higher accuracy in prediction in the testing dataset compared to Decision Model. So Random Forest model will be the final model to predict the activity.The expected out-of-sample error is estimated at 0.005, or 0.5%.  
+### Submission
+The final outcome is to apply Random Forest to the tidy test dataset.
+```{r,echo=TRUE}
+final_pred=predict(fit2,newdata=testdata3,type='class')
+final_pred
+write.table(as.character(final_pred),'final_prediction.csv',row.names=F,col.names='Final.Prediction')
+```
+
